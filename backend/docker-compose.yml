@@ -1,0 +1,28 @@
+version: "3.8"
+
+services:
+  # FastAPI Backend
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - MAIL_DOMAIN=${MAIL_DOMAIN:-ismyemailspam.com}
+      - UPSTASH_REDIS_URL=${UPSTASH_REDIS_URL}
+      - UPSTASH_REDIS_TOKEN=${UPSTASH_REDIS_TOKEN}
+      - RESEND_WEBHOOK_SECRET=${RESEND_WEBHOOK_SECRET}
+      - SPAMASSASSIN_HOST=spamassassin
+      - SPAMASSASSIN_PORT=783
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
+    depends_on:
+      - spamassassin
+    restart: unless-stopped
+
+  # SpamAssassin — industry-standard spam scoring engine
+  spamassassin:
+    image: instantlinux/spamassassin:latest
+    ports:
+      - "783:783"
+    restart: unless-stopped

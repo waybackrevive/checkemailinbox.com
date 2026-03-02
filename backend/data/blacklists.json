@@ -1,0 +1,26 @@
+{
+  "ip_blacklists": [
+    {"name": "Spamhaus ZEN", "dns": "zen.spamhaus.org"},
+    {"name": "Spamhaus SBL", "dns": "sbl.spamhaus.org"},
+    {"name": "Spamhaus XBL", "dns": "xbl.spamhaus.org"},
+    {"name": "Barracuda", "dns": "b.barracudacentral.org"},
+    {"name": "SpamCop", "dns": "bl.spamcop.net"},
+    {"name": "SORBS", "dns": "dnsbl.sorbs.net"},
+    {"name": "UCEPROTECT L1", "dns": "dnsbl-1.uceprotect.net"},
+    {"name": "Composite BL", "dns": "cbl.abuseat.org"},
+    {"name": "Truncate", "dns": "truncate.gbudb.net"},
+    {"name": "PSBL", "dns": "psbl.surriel.com"},
+    {"name": "Mailspike-BL", "dns": "bl.mailspike.net"},
+    {"name": "JustSpam", "dns": "dnsbl.justspam.org"}
+  ],
+  "domain_blacklists": [
+    {"name": "Spamhaus DBL", "dns": "dbl.spamhaus.org"},
+    {"name": "SURBL", "dns": "multi.surbl.org"},
+    {"name": "URIBL", "dns": "multi.uribl.com"},
+    {"name": "ivmURI", "dns": "dnsbl.invaluement.com"},
+    {"name": "Spamhaus ZRD", "dns": "zrd.spamhaus.org"},
+    {"name": "0Spam DNSBL", "dns": "0spam.fusionzero.com"},
+    {"name": "URIBL Red", "dns": "red.uribl.com"},
+    {"name": "URIBL Black", "dns": "black.uribl.com"}
+  ]
+}

@@ -1,0 +1,21 @@
+# IsMyEmailSpam.com — Environment Variables
+# Copy this to .env and fill in your values
+
+# Domain for test email addresses
+MAIL_DOMAIN=ismyemailspam.com
+
+# Upstash Redis (get from https://upstash.com → your database → REST API tab)
+UPSTASH_REDIS_URL=https://your-db.upstash.io
+UPSTASH_REDIS_TOKEN=your-token-here
+
+# Resend (get from https://resend.com/settings/webhooks → signing secret)
+RESEND_WEBHOOK_SECRET=whsec_your-secret-here
+
+# SpamAssassin (Docker sidecar)
+# Use "spamassassin" when running with docker-compose (default)
+# Use "localhost" when running Python directly without Docker
+SPAMASSASSIN_HOST=spamassassin
+SPAMASSASSIN_PORT=783
+
+# Frontend URL (for CORS — change to your production URL in prod)
+FRONTEND_URL=http://localhost:3000
