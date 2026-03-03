@@ -82,7 +82,12 @@ Before clicking **Deploy**, add this environment variable:
 
 👆 Example: `https://checkemaildelivery-production.up.railway.app`
 
-⚠️ **IMPORTANT:** No trailing slash!
+⚠️ **CRITICAL REQUIREMENTS:**
+- ✅ **MUST start with `https://`** — Do not omit the protocol!
+- ✅ **No trailing slash** at the end
+- ❌ Wrong: `checkemaildelivery-production.up.railway.app` (missing https://)
+- ❌ Wrong: `https://checkemaildelivery-production.up.railway.app/` (trailing slash)
+- ✅ Correct: `https://checkemaildelivery-production.up.railway.app`
 
 ### 2.3 Deploy
 
@@ -182,6 +187,22 @@ Add MX records for Resend:
 ---
 
 ## Troubleshooting
+
+### "405 Method Not Allowed" or URL concatenation error
+
+**Problem:** Console shows URLs like `https://yoursite.vercel.app/yourbackend.railway.app/api/...`
+
+**Cause:** `NEXT_PUBLIC_API_URL` in Vercel is missing the `https://` protocol prefix.
+
+**Fix:**
+1. Go to Vercel → Settings → Environment Variables
+2. Find `NEXT_PUBLIC_API_URL`
+3. Make sure it starts with `https://`:
+   - ❌ Wrong: `checkemaildelivery-production.up.railway.app`
+   - ✅ Correct: `https://checkemaildelivery-production.up.railway.app`
+4. Save and **Redeploy**
+
+**Note:** Our code now auto-adds `https://` if missing, but it's best to set it correctly.
 
 ### "Something went wrong" error on frontend
 

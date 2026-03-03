@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { createTest, ApiError } from "@/lib/api";
+import { logger } from "@/lib/logger";
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 import SiteFooter from "@/components/site-footer";
 
@@ -58,8 +59,8 @@ export default function HomePage() {
         setTestId(data.id);
       })
       .catch((err) => {
-        console.error("[handleStartTest] Error:", err);
-        console.error("[handleStartTest] API URL:", process.env.NEXT_PUBLIC_API_URL || "undefined (using default)");
+        logger.error("handleStartTest failed:", err);
+        logger.debug("API URL:", process.env.NEXT_PUBLIC_API_URL || "undefined (using default)");
         
         if (err instanceof ApiError && err.status === 429) {
           setErrorMsg("RATE_LIMIT");

@@ -3,13 +3,31 @@ import type {
   TestStatusResponse,
   EmailReport,
 } from "@/types/report";
+import { logger } from "./logger";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+/**
+ * Ensure API URL has protocol prefix
+ * Prevents treating backend URL as relative path
+ */
+function normalizeApiUrl(url: string): string {
+  if (!url) return "http://localhost:8000";
+  
+  // If URL already has protocol, return as-is
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    return url;
+  }
+  
+  // Otherwise, assume https:// for production domains
+  logger.warn("API URL missing protocol, adding https://", url);
+  return `https://${url}`;
+}
+
+const API_BASE = normalizeApiUrl(
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+);
 
 // Log API base URL in development for debugging
-if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
-  console.log("[API] Base URL:", API_BASE);
-}
+logger.info("API Base URL:", API_BASE);
 
 class ApiError extends Error {
   status: number;
@@ -23,6 +41,8 @@ class ApiError extends Error {
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   try {
     const url = `${API_BASE}${path}`;
+    logger.debug("Making request to:", url);
+    
     const res = await fetch(url, {
       headers: { "Content-Type": "application/json" },
       ...options,
@@ -30,6 +50,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
     if (!res.ok) {
       const body = await res.text().catch(() => "");
+      logger.error("API request failed:", res.status, body);
       throw new ApiError(body || `Request failed: ${res.status}`, res.status);
     }
 
@@ -39,6 +60,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     if (err instanceof ApiError) throw err;
     
     // Network errors (CORS, connection failed, etc.)
+    logger.error("Network error:", err);
     throw new Error(err instanceof Error ? err.message : "Network error");
   }
 }
