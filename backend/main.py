@@ -29,12 +29,19 @@ app = FastAPI(
 )
 
 # CORS — allow frontend to call backend
+# Support multiple origins from comma-separated FRONTEND_URL env var
+allowed_origins = [
+    origin.strip() 
+    for origin in settings.FRONTEND_URL.split(",")
+    if origin.strip()
+]
+# Always allow localhost for local dev
+if "http://localhost:3000" not in allowed_origins:
+    allowed_origins.append("http://localhost:3000")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        settings.FRONTEND_URL,
-        "http://localhost:3000",     # Local dev
-    ],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
