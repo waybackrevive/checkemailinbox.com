@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Instrument_Serif, Plus_Jakarta_Sans } from "next/font/google";
 import { Geist_Mono } from "next/font/google";
 import { Toaster } from "sonner";
+import { Analytics } from "@vercel/analytics/next";
 import { Providers } from "@/components/providers";
 import "./globals.css";
 
@@ -69,6 +70,7 @@ export default function RootLayout({
           {children}
           <Toaster position="bottom-right" richColors />
         </Providers>
+        <Analytics />
       </body>
     </html>
   );
