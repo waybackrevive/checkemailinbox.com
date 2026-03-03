@@ -1,160 +1,199 @@
 """
-Header Parser — extracts SPF, DKIM, DMARC results from raw email headers.
+Header Parser — FIXED v3
+========================
 
-Uses battle-tested libraries:
-  - dkimpy: DKIM signature verification
-  - pyspf: SPF record checking
-  - checkdmarc: DMARC policy parsing
+ROOT CAUSE OF ALL 3 FALSE POSITIVES:
+──────────────────────────────────────────────────────────────────────────────
+Your tool uses Resend for inbound email. Resend sends a JSON webhook, and
+_build_raw_email_from_resend() reconstructs a fake MIME email from that JSON.
 
-We do NOT rebuild these checks. These libraries handle all the RFC edge cases.
+Problem 1 — DKIM always FAILS:
+  dkimpy verifies the DKIM signature CRYPTOGRAPHICALLY on the raw bytes.
+  The reconstructed email body is different from the original — so the
+  RSA signature will never match. dkimpy fails even on perfectly signed email.
+
+Problem 2 — SPF always WARNS:
+  pyspf needs the real originating IP. Your reconstructed email has no
+  Received headers with real IPs, so pyspf gets "127.0.0.1" or empty string.
+  This makes SPF fail even for domains with perfect SPF records.
+
+THE FIX:
+──────────────────────────────────────────────────────────────────────────────
+Read the "Authentication-Results" header as the PRIMARY source of truth.
+
+When Resend receives your email, its own MX server runs SPF/DKIM/DMARC
+verification and writes the result into the Authentication-Results header.
+This header is passed through in Resend's webhook payload → headers array
+→ included in the reconstructed email by _build_raw_email_from_resend().
+
+This IS the real result. It's what Gmail, Outlook, etc. would have seen.
 """
 
 import email
 import re
+import logging
 from typing import Optional, Tuple
 
-import dkim
-import spf
 import checkdmarc
 
 from models.schemas import AuthCheck, AuthenticationResult, CheckStatus
 
+logger = logging.getLogger(__name__)
 
-def _extract_sender_info(raw_email: str) -> Tuple[str, str, str]:
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Read Authentication-Results header (ground truth)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _parse_auth_results_header(raw_email: str) -> dict:
     """
-    Extract From address, domain, and sending IP from raw email.
-    Returns: (from_address, from_domain, sending_ip)
+    Parse Authentication-Results + ARC-Authentication-Results headers.
+
+    Real example written by Resend's MX server:
+      Authentication-Results: mx.resend.com;
+         spf=pass smtp.mailfrom=support@waybackrevive.com;
+         dkim=pass header.i=@waybackrevive.com header.s=resend;
+         dmarc=pass header.from=waybackrevive.com
+
+    We read this — not try to re-verify the crypto ourselves.
     """
+    out = {
+        "spf":   {"status": None, "detail": ""},
+        "dkim":  {"status": None, "detail": ""},
+        "dmarc": {"status": None, "detail": ""},
+    }
+
+    # Collect all relevant headers — unfold multiline folding
     msg = email.message_from_string(raw_email)
+    header_values = (
+        msg.get_all("Authentication-Results", []) +
+        msg.get_all("ARC-Authentication-Results", [])
+    )
 
-    # From address
-    from_header = msg.get("From", "")
-    # Extract email from "Name <email@domain.com>" format
-    match = re.search(r'[\w.+-]+@[\w.-]+\.\w+', from_header)
-    from_address = match.group(0) if match else from_header
-    from_domain = from_address.split("@")[-1] if "@" in from_address else ""
+    if not header_values:
+        logger.warning("No Authentication-Results header in email — Resend may not be passing headers")
+        return out
 
-    # Sending IP — from the first Received header (bottom-most = originating)
-    received_headers = msg.get_all("Received", [])
-    sending_ip = ""
-    if received_headers:
-        # Original sender is typically the LAST Received header
-        last_received = received_headers[-1]
-        ip_match = re.search(r'\[(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\]', last_received)
-        if ip_match:
-            sending_ip = ip_match.group(1)
+    full_text = " ".join(header_values).lower()
+    logger.debug(f"Auth-Results text: {full_text[:300]}")
 
-    return from_address, from_domain, sending_ip
+    # ── SPF ──────────────────────────────────────────────────────────────────
+    m = re.search(r"\bspf=(pass|fail|softfail|neutral|none|temperror|permerror)\b", full_text)
+    if m:
+        v = m.group(1)
+        if v == "pass":
+            out["spf"] = {
+                "status": CheckStatus.PASS,
+                "detail": "SPF pass — your sending server is authorized to send email for this domain.",
+            }
+        elif v == "softfail":
+            out["spf"] = {
+                "status": CheckStatus.WARNING,
+                "detail": (
+                    "SPF soft fail (~all) — email was accepted but flagged with a minor warning. "
+                    "Consider changing your SPF record from '~all' to '-all' for stricter enforcement."
+                ),
+            }
+        elif v in ("fail", "permerror"):
+            out["spf"] = {
+                "status": CheckStatus.FAIL,
+                "detail": (
+                    "SPF hard fail — this sending server is not authorized. "
+                    "Your SPF record needs to include this sending service."
+                ),
+            }
+        elif v == "none":
+            out["spf"] = {
+                "status": CheckStatus.FAIL,
+                "detail": "No SPF record found for this domain. Add one to authorize your sending server.",
+            }
+        else:
+            out["spf"] = {
+                "status": CheckStatus.WARNING,
+                "detail": f"SPF returned '{v}' — review your SPF record configuration.",
+            }
+
+    # ── DKIM ─────────────────────────────────────────────────────────────────
+    m = re.search(r"\bdkim=(pass|fail|none|neutral|policy|temperror|permerror)\b", full_text)
+    if m:
+        v = m.group(1)
+        if v == "pass":
+            out["dkim"] = {
+                "status": CheckStatus.PASS,
+                "detail": (
+                    "DKIM signature verified — your email is cryptographically authenticated "
+                    "and has not been tampered with in transit."
+                ),
+            }
+        elif v in ("fail", "permerror"):
+            out["dkim"] = {
+                "status": CheckStatus.FAIL,
+                "detail": (
+                    "DKIM signature invalid — the signature doesn't match. "
+                    "Check that DKIM is properly set up in your email provider."
+                ),
+            }
+        elif v == "none":
+            out["dkim"] = {
+                "status": CheckStatus.FAIL,
+                "detail": (
+                    "No DKIM signature on this email. "
+                    "Enable DKIM signing in your email provider (Google Workspace, Resend, etc.)."
+                ),
+            }
+        else:
+            out["dkim"] = {
+                "status": CheckStatus.WARNING,
+                "detail": f"DKIM result: '{v}' — check your DKIM configuration.",
+            }
+
+    # ── DMARC ─────────────────────────────────────────────────────────────────
+    m = re.search(r"\bdmarc=(pass|fail|none|bestguesspass)\b", full_text)
+    if m:
+        v = m.group(1)
+        if v in ("pass", "bestguesspass"):
+            out["dmarc"] = {
+                "status": CheckStatus.PASS,
+                "detail": "DMARC aligned — your From domain aligns with SPF and/or DKIM.",
+            }
+        elif v == "fail":
+            out["dmarc"] = {
+                "status": CheckStatus.FAIL,
+                "detail": (
+                    "DMARC failed — your From domain does not align with SPF/DKIM. "
+                    "Check that your sending domain matches your authenticated domain."
+                ),
+            }
+        elif v == "none":
+            out["dmarc"] = {
+                "status": CheckStatus.MISSING,
+                "detail": "No DMARC record found. Add a DMARC TXT record to your DNS.",
+            }
+
+    logger.info(
+        f"Auth-Results parsed: "
+        f"SPF={out['spf']['status']} "
+        f"DKIM={out['dkim']['status']} "
+        f"DMARC={out['dmarc']['status']}"
+    )
+    return out
 
 
-def check_spf(raw_email: str, sending_ip: str, from_domain: str, from_address: str) -> AuthCheck:
+# ─────────────────────────────────────────────────────────────────────────────
+# DMARC DNS check — fallback + policy details
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _check_dmarc_dns(domain: str) -> Tuple[CheckStatus, str]:
     """
-    Check SPF record for the sender's domain.
-    Uses pyspf library which handles recursive DNS includes/redirects.
+    Query DNS for DMARC record.
+    Used when Authentication-Results doesn't have DMARC, or to get policy details.
     """
     try:
-        # pyspf.check2 returns (result, code, explanation)
-        # but some versions may return only 2 values — unpack safely
-        result_tuple = spf.check2(
-            i=sending_ip or "127.0.0.1",
-            s=from_address,
-            h=from_domain,
-        )
-        if len(result_tuple) >= 3:
-            result, code, explanation = result_tuple[0], result_tuple[1], result_tuple[2]
-        elif len(result_tuple) == 2:
-            result, explanation = result_tuple[0], result_tuple[1]
-        else:
-            result = str(result_tuple[0]) if result_tuple else "temperror"
-            explanation = "Unexpected SPF response"
+        result = checkdmarc.check_domains([domain])
+        domain_result = result[0] if isinstance(result, list) and result else result
 
-        if result == "pass":
-            return AuthCheck(
-                name="SPF",
-                status=CheckStatus.PASS,
-                description="Your server is authorized to send emails for this domain.",
-                details=f"SPF check passed. Sending IP {sending_ip} is permitted.",
-            )
-        elif result in ("softfail", "neutral", "none"):
-            return AuthCheck(
-                name="SPF",
-                status=CheckStatus.WARNING,
-                description="Your SPF record is weak or missing. Some servers may reject your emails.",
-                details=f"SPF result: {result}. {explanation}",
-            )
-        else:
-            return AuthCheck(
-                name="SPF",
-                status=CheckStatus.FAIL,
-                description="Your server is NOT authorized to send emails for this domain.",
-                details=f"SPF result: {result}. {explanation}",
-            )
-    except Exception as e:
-        return AuthCheck(
-            name="SPF",
-            status=CheckStatus.WARNING,
-            description="Could not verify SPF record.",
-            details=f"SPF check error: {str(e)}",
-        )
-
-
-def check_dkim(raw_email: str) -> AuthCheck:
-    """
-    Verify DKIM signature on the email.
-    Uses dkimpy which handles RSA crypto + DNS selector lookup + canonicalization.
-    """
-    try:
-        raw_bytes = raw_email.encode("utf-8")
-        result = dkim.verify(raw_bytes)
-
-        if result:
-            return AuthCheck(
-                name="DKIM",
-                status=CheckStatus.PASS,
-                description="Your emails are digitally signed and verified.",
-                details="DKIM signature is valid. Recipients can trust this email came from you.",
-            )
-        else:
-            return AuthCheck(
-                name="DKIM",
-                status=CheckStatus.FAIL,
-                description="Your emails are NOT digitally signed. They can be spoofed.",
-                details="DKIM verification failed. The signature is missing or invalid.",
-            )
-    except dkim.DKIMException as e:
-        return AuthCheck(
-            name="DKIM",
-            status=CheckStatus.FAIL,
-            description="DKIM signature could not be verified.",
-            details=f"DKIM error: {str(e)}",
-        )
-    except Exception as e:
-        return AuthCheck(
-            name="DKIM",
-            status=CheckStatus.WARNING,
-            description="Could not check DKIM signature.",
-            details=f"DKIM check error: {str(e)}",
-        )
-
-
-def check_dmarc(from_domain: str) -> AuthCheck:
-    """
-    Check DMARC policy for the sender's domain.
-    Uses checkdmarc which handles policy parsing, subdomain inheritance, and reporting URIs.
-    """
-    try:
-        result = checkdmarc.check_domains([from_domain])
-
-        if isinstance(result, list) and len(result) > 0:
-            domain_result = result[0]
-        else:
-            domain_result = result
-
-        # checkdmarc returns a dict or object with dmarc info
         dmarc_info = None
         if isinstance(domain_result, dict):
-            dmarc_info = domain_result.get("dmarc", {})
-        elif hasattr(domain_result, "get"):
             dmarc_info = domain_result.get("dmarc", {})
 
         if dmarc_info and dmarc_info.get("record"):
@@ -162,58 +201,137 @@ def check_dmarc(from_domain: str) -> AuthCheck:
             record = dmarc_info.get("record", "")
 
             if policy in ("reject", "quarantine"):
-                return AuthCheck(
-                    name="DMARC",
-                    status=CheckStatus.PASS,
-                    description=f"DMARC policy is set to '{policy}'. Your domain is protected.",
-                    details=f"Record: {record}",
+                return (
+                    CheckStatus.PASS,
+                    f"DMARC policy is '{policy}'. Your domain is protected against spoofing.",
                 )
-            else:
-                return AuthCheck(
-                    name="DMARC",
-                    status=CheckStatus.WARNING,
-                    description="DMARC policy is set to 'none'. No enforcement — spoofing is possible.",
-                    details=f"Record: {record}. Consider upgrading to p=quarantine or p=reject.",
+            else:  # p=none
+                return (
+                    CheckStatus.WARNING,
+                    (
+                        "DMARC policy is 'none' (monitoring only) — no enforcement. "
+                        "Spoofed emails can still reach recipients. "
+                        "Upgrade to p=quarantine for real protection."
+                    ),
                 )
         else:
-            return AuthCheck(
-                name="DMARC",
-                status=CheckStatus.FAIL,
-                description="No DMARC policy found. Your domain can be freely spoofed.",
-                details="Add a DMARC TXT record to your domain DNS.",
+            return (
+                CheckStatus.FAIL,
+                "No DMARC record found. Add a _dmarc TXT record to your domain DNS.",
             )
 
     except Exception as e:
-        return AuthCheck(
-            name="DMARC",
-            status=CheckStatus.WARNING,
-            description="Could not check DMARC record.",
-            details=f"DMARC check error: {str(e)}",
+        logger.warning(f"DMARC DNS check failed for {domain}: {e}")
+        return (
+            CheckStatus.WARNING,
+            f"DMARC check could not be completed: {str(e)[:80]}",
         )
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Extract sender info from reconstructed email
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _extract_sender_info(raw_email: str) -> Tuple[str, str, str]:
+    """Extract from_address, from_domain, sending_ip."""
+    msg = email.message_from_string(raw_email)
+
+    from_header = msg.get("From", "")
+    match = re.search(r"[\w.+-]+@[\w.-]+\.\w+", from_header)
+    from_address = match.group(0) if match else from_header
+    from_domain = from_address.split("@")[-1] if "@" in from_address else ""
+
+    # IP from Received headers (best effort — may not be in reconstructed email)
+    received_headers = msg.get_all("Received", [])
+    sending_ip = ""
+    if received_headers:
+        last_received = received_headers[-1]
+        ip_match = re.search(r"\[(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\]", last_received)
+        if ip_match:
+            sending_ip = ip_match.group(1)
+
+    return from_address, from_domain, sending_ip
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MAIN ENTRY POINT
+# ─────────────────────────────────────────────────────────────────────────────
+
 def parse_headers(raw_email: str) -> Tuple[AuthenticationResult, str, str, str, str]:
     """
-    Main entry point: run all 3 authentication checks on a raw email.
+    Parse all authentication checks from a raw (reconstructed) email.
 
-    Returns:
-        (AuthenticationResult, from_address, from_domain, sending_ip, subject)
+    Strategy:
+    1. Read Authentication-Results header (GROUND TRUTH from Resend's MX)
+    2. DMARC: also query DNS for policy details
+    3. Never report FAIL from live crypto checks (causes false positives)
+
+    Returns: (AuthenticationResult, from_address, from_domain, sending_ip, subject)
     """
-    # Extract sender info
     from_address, from_domain, sending_ip = _extract_sender_info(raw_email)
 
-    # Extract subject
     msg = email.message_from_string(raw_email)
     subject = msg.get("Subject", "(no subject)")
 
-    # Run all 3 checks
-    spf_result = check_spf(raw_email, sending_ip, from_domain, from_address)
-    dkim_result = check_dkim(raw_email)
-    dmarc_result = check_dmarc(from_domain)
+    # Parse Authentication-Results (primary source)
+    ar = _parse_auth_results_header(raw_email)
 
-    checks = [spf_result, dkim_result, dmarc_result]
+    # ── SPF ──────────────────────────────────────────────────────────────────
+    if ar["spf"]["status"] is not None:
+        spf_status = ar["spf"]["status"]
+        spf_detail = ar["spf"]["detail"]
+    else:
+        # Header missing — don't falsely fail, mark unknown
+        spf_status = CheckStatus.WARNING
+        spf_detail = (
+            "SPF result not found in email headers. "
+            "This may be a configuration issue with your inbound email setup."
+        )
 
-    # Calculate authentication section score (out of 100)
+    # ── DKIM ─────────────────────────────────────────────────────────────────
+    if ar["dkim"]["status"] is not None:
+        dkim_status = ar["dkim"]["status"]
+        dkim_detail = ar["dkim"]["detail"]
+    else:
+        dkim_status = CheckStatus.WARNING
+        dkim_detail = (
+            "DKIM result not found in email headers. "
+            "Check that DKIM signing is enabled in your email provider."
+        )
+
+    # ── DMARC: header first, DNS fallback ────────────────────────────────────
+    if ar["dmarc"]["status"] is not None:
+        dmarc_status = ar["dmarc"]["status"]
+        dmarc_detail = ar["dmarc"]["detail"]
+    else:
+        # No header result — check DNS directly
+        dmarc_status, dmarc_detail = _check_dmarc_dns(from_domain)
+
+    # ── Build result objects ──────────────────────────────────────────────────
+    spf_check = AuthCheck(
+        name="SPF",
+        status=spf_status,
+        description=_status_to_description("SPF", spf_status),
+        details=spf_detail,
+    )
+
+    dkim_check = AuthCheck(
+        name="DKIM",
+        status=dkim_status,
+        description=_status_to_description("DKIM", dkim_status),
+        details=dkim_detail,
+    )
+
+    dmarc_check = AuthCheck(
+        name="DMARC",
+        status=dmarc_status,
+        description=_status_to_description("DMARC", dmarc_status),
+        details=dmarc_detail,
+    )
+
+    checks = [spf_check, dkim_check, dmarc_check]
+
+    # Section score (0-100)
     score = 0.0
     for check in checks:
         if check.name == "SPF":
@@ -223,6 +341,39 @@ def parse_headers(raw_email: str) -> Tuple[AuthenticationResult, str, str, str, 
         elif check.name == "DMARC":
             score += 30 if check.status == CheckStatus.PASS else (10 if check.status == CheckStatus.WARNING else 0)
 
-    auth_result = AuthenticationResult(checks=checks, score=score)
+    logger.info(
+        f"[Auth] {from_address}: "
+        f"SPF={spf_status} DKIM={dkim_status} DMARC={dmarc_status} "
+        f"score={score:.0f}/100"
+    )
 
-    return auth_result, from_address, from_domain, sending_ip, subject
+    return (
+        AuthenticationResult(checks=checks, score=score),
+        from_address,
+        from_domain,
+        sending_ip,
+        subject,
+    )
+
+
+def _status_to_description(check_name: str, status: CheckStatus) -> str:
+    """Short plain-English description for each check result."""
+    descriptions = {
+        "SPF": {
+            CheckStatus.PASS:    "Your server is authorized to send emails for this domain.",
+            CheckStatus.WARNING: "SPF is configured but may have issues.",
+            CheckStatus.FAIL:    "Your server is NOT authorized to send emails for this domain.",
+        },
+        "DKIM": {
+            CheckStatus.PASS:    "Your emails are digitally signed and verified.",
+            CheckStatus.WARNING: "DKIM could not be fully verified.",
+            CheckStatus.FAIL:    "Your emails are NOT digitally signed. They can be spoofed.",
+        },
+        "DMARC": {
+            CheckStatus.PASS:    "DMARC policy protects your domain from spoofing.",
+            CheckStatus.WARNING: "DMARC exists but has weak enforcement (p=none).",
+            CheckStatus.FAIL:    "No DMARC policy. Your domain can be freely spoofed.",
+            CheckStatus.MISSING: "No DMARC record found. Your domain can be freely spoofed.",
+        },
+    }
+    return descriptions.get(check_name, {}).get(status, str(status))

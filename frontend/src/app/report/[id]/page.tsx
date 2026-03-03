@@ -20,8 +20,9 @@ function statusBadge(status: CheckStatus, label?: string) {
     pass:    { bg: "bg-brand-light", border: "border-brand/20",  text: "text-brand",  fallback: "✓ PASS" },
     fail:    { bg: "bg-danger-light", border: "border-danger/20", text: "text-danger", fallback: "✕ FAIL" },
     warning: { bg: "bg-warn-light", border: "border-warn/25",   text: "text-warn",   fallback: "⚠ WARNING" },
+    missing: { bg: "bg-warn-light", border: "border-warn/25",   text: "text-warn",   fallback: "⚠ MISSING" },
   };
-  const s = map[status];
+  const s = map[status] || map.warning;
   return (
     <span className={`font-mono text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${s.bg} ${s.border} ${s.text}`}>
       {label || s.fallback}
@@ -51,7 +52,7 @@ function riskBadge(level: string) {
 
 function countStats(report: EmailReport) {
   let critical = 0, warnings = 0, passed = 0;
-  report.action_plan.forEach((a) => { if (a.status === "fail") critical++; else if (a.status === "warning") warnings++; });
+  report.action_plan.forEach((a) => { if (a.status === "fail") critical++; else if (a.status === "warning" || a.status === "missing") warnings++; });
   report.authentication.checks.forEach((c) => { if (c.status === "pass") passed++; });
   // reputation items
   if (report.reputation.ip_blacklist_count === 0) passed++;
@@ -137,13 +138,13 @@ function CheckRow({
   fix?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const hasFix = (status === "fail" || status === "warning") && (detail || fix);
+  const hasFix = (status === "fail" || status === "warning" || status === "missing") && (detail || fix);
 
   return (
     <div
       className={`rounded-[10px] border transition-all ${
         status === "fail" ? "border-danger/20 bg-danger-light/50" :
-        status === "warning" ? "border-warn/20 bg-warn-light/50" :
+        (status === "warning" || status === "missing") ? "border-warn/20 bg-warn-light/50" :
         "border-border bg-bg"
       }`}
     >
@@ -287,7 +288,7 @@ export default function ReportPage() {
               { label: "Critical Issues", value: stats.critical, color: "text-danger", bg: "bg-danger-light" },
               { label: "Warnings", value: stats.warnings, color: "text-warn", bg: "bg-warn-light" },
               { label: "Checks Passed", value: stats.passed, color: "text-brand", bg: "bg-brand-light" },
-              { label: "SpamAssassin", value: report.spamassassin.score.toFixed(1), color: report.spamassassin.is_spam ? "text-danger" : "text-warn", bg: report.spamassassin.is_spam ? "bg-danger-light" : "bg-warn-light" },
+              { label: "SpamAssassin", value: report.spamassassin.available === false ? "N/A" : report.spamassassin.score.toFixed(1), color: report.spamassassin.available === false ? "text-muted" : report.spamassassin.is_spam ? "text-danger" : "text-warn", bg: report.spamassassin.available === false ? "bg-bg" : report.spamassassin.is_spam ? "bg-danger-light" : "bg-warn-light" },
             ].map((s) => (
               <div key={s.label} className={`rounded-[10px] p-3 text-center ${s.bg}`}>
                 <div className={`font-display text-2xl ${s.color}`} style={{ fontWeight: 400, lineHeight: 1, letterSpacing: "-1px" }}>
@@ -343,6 +344,7 @@ export default function ReportPage() {
                 statusLabel={
                   check.status === "pass" ? `✓ PASS` :
                   check.status === "fail" ? `✕ FAIL` :
+                  check.status === "missing" ? `⚠ MISSING` :
                   `⚠ ${check.name === "DMARC" ? "MISSING" : "WARNING"}`
                 }
                 detail={check.description}
@@ -437,30 +439,42 @@ export default function ReportPage() {
                 <span className="flex items-center gap-2.5 text-[13px] font-medium text-navy">
                   📊 SpamAssassin Score
                 </span>
-                {statusBadge(
-                  report.spamassassin.is_spam ? "fail" : report.content.spamassassin_status,
-                  report.spamassassin.is_spam ? `✕ ${report.spamassassin.score} / ${report.spamassassin.threshold}` : `${report.spamassassin.score} / ${report.spamassassin.threshold}`
+                {report.spamassassin.available === false ? (
+                  statusBadge("warning", "⚠ UNAVAILABLE")
+                ) : (
+                  statusBadge(
+                    report.spamassassin.is_spam ? "fail" : report.content.spamassassin_status,
+                    report.spamassassin.is_spam ? `✕ ${report.spamassassin.score} / ${report.spamassassin.threshold}` : `${report.spamassassin.score} / ${report.spamassassin.threshold}`
+                  )
                 )}
               </div>
-              {/* Score bar */}
-              <div className="w-full h-2 rounded-full overflow-hidden mb-2" style={{ background: "var(--color-border)" }}>
-                <div
-                  className={`h-full rounded-full ${scoreBarColor(Math.max(0, 100 - report.spamassassin.score * 10))}`}
-                  style={{ width: `${Math.min(100, (report.spamassassin.score / report.spamassassin.threshold) * 100)}%`, transition: "width 1s ease" }}
-                />
-              </div>
-              {/* Rules */}
-              {report.spamassassin.rules_hit.length > 0 && (
-                <div className="mt-3">
-                  <div className="text-[11px] font-semibold text-muted uppercase mb-1.5" style={{ letterSpacing: "1px" }}>Rules triggered:</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {report.spamassassin.rules_hit.map((rule) => (
-                      <span key={rule} className="font-mono text-[10px] text-muted bg-white border border-border rounded px-2 py-0.5">
-                        {rule}
-                      </span>
-                    ))}
+              {report.spamassassin.available === false ? (
+                <p className="text-[12.5px] text-muted" style={{ lineHeight: 1.6 }}>
+                  SpamAssassin scan is not available right now. Your overall score is calculated using the other checks. This does not affect SPF, DKIM, DMARC, or blacklist results.
+                </p>
+              ) : (
+                <>
+                  {/* Score bar */}
+                  <div className="w-full h-2 rounded-full overflow-hidden mb-2" style={{ background: "var(--color-border)" }}>
+                    <div
+                      className={`h-full rounded-full ${scoreBarColor(Math.max(0, 100 - report.spamassassin.score * 10))}`}
+                      style={{ width: `${Math.min(100, (report.spamassassin.score / report.spamassassin.threshold) * 100)}%`, transition: "width 1s ease" }}
+                    />
                   </div>
-                </div>
+                  {/* Rules */}
+                  {report.spamassassin.rules_hit.length > 0 && (
+                    <div className="mt-3">
+                      <div className="text-[11px] font-semibold text-muted uppercase mb-1.5" style={{ letterSpacing: "1px" }}>Rules triggered:</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {report.spamassassin.rules_hit.map((rule) => (
+                          <span key={rule} className="font-mono text-[10px] text-muted bg-white border border-border rounded px-2 py-0.5">
+                            {rule}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </Section>

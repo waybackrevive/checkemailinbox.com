@@ -40,6 +40,8 @@ export function getStatusColor(status: CheckStatus): string {
       return "text-orange-500";
     case "fail":
       return "text-red-600";
+    case "missing":
+      return "text-orange-500";
   }
 }
 
@@ -53,6 +55,8 @@ export function getStatusBadgeVariant(
       return "warning";
     case "fail":
       return "destructive";
+    case "missing":
+      return "warning";
   }
 }
 
@@ -64,6 +68,8 @@ export function getStatusIcon(status: CheckStatus): string {
       return "⚠";
     case "fail":
       return "✗";
+    case "missing":
+      return "⚠";
   }
 }
 

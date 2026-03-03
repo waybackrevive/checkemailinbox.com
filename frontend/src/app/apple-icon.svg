@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f2744"/>
+      <stop offset="100%" style="stop-color:#0c1a2e"/>
+    </linearGradient>
+    <linearGradient id="check" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#10b981"/>
+      <stop offset="100%" style="stop-color:#0ea66e"/>
+    </linearGradient>
+  </defs>
+  <!-- Rounded square background -->
+  <rect width="512" height="512" rx="96" ry="96" fill="url(#bg)"/>
+  <!-- Envelope body -->
+  <rect x="80" y="150" width="352" height="240" rx="24" ry="24" fill="none" stroke="#e2e8f0" stroke-width="24" stroke-linejoin="round"/>
+  <!-- Envelope flap (V shape) -->
+  <polyline points="80,150 256,300 432,150" fill="none" stroke="#e2e8f0" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Green circle badge -->
+  <circle cx="400" cy="160" r="80" fill="url(#check)"/>
+  <!-- White checkmark inside circle -->
+  <polyline points="358,158 388,192 442,132" fill="none" stroke="#ffffff" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

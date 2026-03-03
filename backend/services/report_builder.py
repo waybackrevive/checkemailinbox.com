@@ -45,7 +45,7 @@ def _build_action_plan(
     # --- Authentication fixes ---
 
     for check in auth.checks:
-        if check.status == CheckStatus.FAIL:
+        if check.status in (CheckStatus.FAIL, CheckStatus.MISSING):
             priority += 1
 
             if check.name == "SPF":

@@ -1,6 +1,6 @@
 // TypeScript types — mirrors backend Pydantic schemas exactly
 
-export type CheckStatus = "pass" | "fail" | "warning";
+export type CheckStatus = "pass" | "fail" | "warning" | "missing";
 export type TestStatus = "waiting" | "received" | "processing" | "ready" | "expired";
 export type RiskLevel = "low" | "medium" | "high";
 
@@ -69,11 +69,13 @@ export interface ContentResult {
 }
 
 export interface SpamAssassinResult {
+  available: boolean;
   score: number;
   threshold: number;
   is_spam: boolean;
   rules_hit: string[];
   section_score: number;
+  status: CheckStatus;
 }
 
 export interface ActionItem {
