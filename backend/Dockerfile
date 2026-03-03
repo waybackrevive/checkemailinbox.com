@@ -16,9 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 ARG CACHEBUST=1
 COPY . .
 
-# Railway uses $PORT env var; default to 8000 for local dev
-ENV PORT=8000
 EXPOSE 8000
 
-# Run with uvicorn — uses shell form so $PORT is expanded at runtime
-CMD uvicorn main:app --host 0.0.0.0 --port $PORT
+# Run with uvicorn — Python handles PORT env var for Railway compatibility
+CMD ["python", "-c", "import os,uvicorn;uvicorn.run('main:app',host='0.0.0.0',port=int(os.environ.get('PORT','8000')))"]
