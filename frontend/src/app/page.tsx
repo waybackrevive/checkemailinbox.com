@@ -100,6 +100,7 @@ export default function HomePage() {
           <ul className="hidden md:flex items-center gap-1.5 list-none">
             <li><a href="#how" className="text-[13px] font-medium text-muted no-underline px-3 py-1.5 rounded-md hover:text-navy hover:bg-border-soft transition-colors">How It Works</a></li>
             <li><a href="#checks" className="text-[13px] font-medium text-muted no-underline px-3 py-1.5 rounded-md hover:text-navy hover:bg-border-soft transition-colors">What We Check</a></li>
+            <li><a href="/about" className="text-[13px] font-medium text-muted no-underline px-3 py-1.5 rounded-md hover:text-navy hover:bg-border-soft transition-colors">About</a></li>
             <li>
               <button onClick={() => { if (testId) { handleGoWaiting(); } else { document.getElementById("hero-cta")?.scrollIntoView({ behavior: "smooth" }); } }} className="bg-navy text-white text-[13px] font-semibold px-4 py-1.5 rounded-lg hover:bg-navy-soft transition-all cursor-pointer border-none" style={{ transform: "translateY(0)" }}>
                 Run Free Test →

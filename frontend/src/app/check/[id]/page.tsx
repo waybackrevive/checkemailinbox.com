@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useTestPolling } from "@/hooks/useTestPolling";
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
+import SiteHeader from "@/components/site-header";
+import SiteFooter from "@/components/site-footer";
 
 /* ─── Status helpers ─── */
 type Step = "generated" | "waiting" | "analyzing" | "ready";
@@ -37,8 +39,24 @@ export default function WaitingPage() {
   const { data, isLoading } = useTestPolling(testId);
   const { copied, copy } = useCopyToClipboard();
 
-  const activeStep = getActiveStep(data?.status);
-  const activeIdx = stepIndex(activeStep);
+  // Progressive step display — minimum 1.5s per step so user sees each stage
+  const rawStep = getActiveStep(data?.status);
+  const rawIdx = stepIndex(rawStep);
+  const [displayIdx, setDisplayIdx] = useState(0);
+  const advanceTimer = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (rawIdx > displayIdx) {
+      // Advance one step at a time with minimum delay
+      advanceTimer.current = setTimeout(() => {
+        setDisplayIdx((prev) => Math.min(prev + 1, rawIdx));
+      }, 1500);
+      return () => { if (advanceTimer.current) clearTimeout(advanceTimer.current); };
+    }
+  }, [rawIdx, displayIdx]);
+
+  const activeIdx = displayIdx;
+  const activeStep = (["generated", "waiting", "analyzing", "ready"] as Step[])[activeIdx];
 
   // Countdown timer — 1 hour from page load
   const [secondsLeft, setSecondsLeft] = useState(3600);
@@ -51,13 +69,13 @@ export default function WaitingPage() {
   const secs = secondsLeft % 60;
   const pct = ((3600 - secondsLeft) / 3600) * 100;
 
-  // Auto-redirect on ready
+  // Auto-redirect on ready (only after display catches up)
   useEffect(() => {
-    if (data?.status === "ready") {
-      const t = setTimeout(() => router.push(`/report/${testId}`), 1500);
+    if (activeStep === "ready") {
+      const t = setTimeout(() => router.push(`/report/${testId}`), 2000);
       return () => clearTimeout(t);
     }
-  }, [data?.status, testId, router]);
+  }, [activeStep, testId, router]);
 
   const email = data?.email ?? "Loading...";
 
@@ -69,7 +87,9 @@ export default function WaitingPage() {
   ], []);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-start py-16 px-5 relative overflow-hidden" style={{ background: "var(--color-bg)" }}>
+    <div className="min-h-screen flex flex-col" style={{ background: "var(--color-bg)" }}>
+      <SiteHeader />
+      <div className="flex-1 flex flex-col items-center justify-start py-16 px-5 relative overflow-hidden">
 
       {/* ─── ENVELOPE ANIMATION ─── */}
       <div className="relative mb-10" style={{ width: 200, height: 200 }}>
@@ -211,6 +231,8 @@ export default function WaitingPage() {
           ))}
         </div>
       </div>
+      </div>
+      <SiteFooter />
     </div>
   );
 }

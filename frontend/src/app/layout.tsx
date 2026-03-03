@@ -37,6 +37,24 @@ export const metadata: Metadata = {
     "spam score",
     "email delivery test",
   ],
+  metadataBase: new URL("https://checkemaildelivery.com"),
+  alternates: { canonical: "/" },
+  robots: { index: true, follow: true },
+  openGraph: {
+    title: "CheckEmailDelivery.com — Will Your Email Actually Reach the Inbox?",
+    description:
+      "Send a test email and get a full delivery audit — authentication, reputation, content, blacklists — with exact steps to fix every issue. Free, no signup.",
+    url: "https://checkemaildelivery.com",
+    siteName: "CheckEmailDelivery",
+    type: "website",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "CheckEmailDelivery.com — Free Email Deliverability Test",
+    description:
+      "Send a test email and get a full delivery audit with exact steps to fix every issue.",
+  },
 };
 
 export default function RootLayout({

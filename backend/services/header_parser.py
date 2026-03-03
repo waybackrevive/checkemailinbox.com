@@ -54,12 +54,19 @@ def check_spf(raw_email: str, sending_ip: str, from_domain: str, from_address: s
     """
     try:
         # pyspf.check2 returns (result, code, explanation)
-        # result: 'pass', 'fail', 'softfail', 'neutral', 'none', 'permerror', 'temperror'
-        result, code, explanation = spf.check2(
+        # but some versions may return only 2 values — unpack safely
+        result_tuple = spf.check2(
             i=sending_ip or "127.0.0.1",
             s=from_address,
             h=from_domain,
         )
+        if len(result_tuple) >= 3:
+            result, code, explanation = result_tuple[0], result_tuple[1], result_tuple[2]
+        elif len(result_tuple) == 2:
+            result, explanation = result_tuple[0], result_tuple[1]
+        else:
+            result = str(result_tuple[0]) if result_tuple else "temperror"
+            explanation = "Unexpected SPF response"
 
         if result == "pass":
             return AuthCheck(

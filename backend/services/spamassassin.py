@@ -56,9 +56,9 @@ def _spamc_check(raw_email: str) -> Tuple[float, List[str]]:
 
         return score, rules
 
-    except (socket.timeout, ConnectionRefusedError, OSError) as e:
-        # SpamAssassin not available — return a neutral score
-        return 0.0, [f"SpamAssassin unavailable: {str(e)}"]
+    except (socket.timeout, ConnectionRefusedError, OSError):
+        # SpamAssassin not available — return neutral score with clean message
+        return 0.0, ["SpamAssassin scan not available — score based on other checks"]
 
 
 def _parse_score(response: str) -> float:

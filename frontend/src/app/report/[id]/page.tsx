@@ -5,6 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { getReport } from "@/lib/api";
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
+import SiteHeader from "@/components/site-header";
+import SiteFooter from "@/components/site-footer";
 import type {
   EmailReport,
   CheckStatus,
@@ -237,6 +239,9 @@ export default function ReportPage() {
 
   return (
     <div className="min-h-screen" style={{ background: "var(--color-bg)" }}>
+      {/* Header */}
+      <SiteHeader />
+
       {/* Thin progress bar at top */}
       <div className="fixed top-0 left-0 right-0 h-[3px] z-50" style={{ background: "var(--color-border)" }}>
         <div className={`h-full ${scoreBarColor(report.final_score)} animate-fillBar`} style={{ width: `${report.final_score}%` }} />
@@ -503,6 +508,9 @@ export default function ReportPage() {
           </div>
         </main>
       </div>
+
+      {/* Footer */}
+      <SiteFooter />
 
       {/* ───── Responsive overrides ───── */}
       <style>{`
