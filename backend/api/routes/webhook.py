@@ -21,6 +21,7 @@ from config import settings
 from models.schemas import TestStatus, CheckStatus
 from storage.redis_client import (
     get_test_session,
+    save_test_session,
     update_test_session,
     save_report,
 )
@@ -148,8 +149,20 @@ async def receive_cloudflare_webhook(request: Request):
 
         session = get_test_session(test_id)
         if session is None:
-            logger.warning(f"Session not found: {test_id}")
-            raise HTTPException(status_code=404, detail="Test session not found or expired")
+            # Session expired or was lost (e.g., during a redeploy).
+            # Recreate it so the analysis can still complete — the email is valid.
+            logger.warning(f"Session not found for {test_id} — recreating from webhook data")
+            session = {
+                "id": test_id,
+                "email": recipient,
+                "status": "waiting",
+                "created_at": None,
+                "expires_at": None,
+                "raw_email": None,
+                "from_address": None,
+                "subject": None,
+            }
+            save_test_session(test_id, session)
 
         # ── Update session ────────────────────────────────────────────────
         subject = _extract_email_field(raw_email, "Subject")

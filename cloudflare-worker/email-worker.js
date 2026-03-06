@@ -15,6 +15,14 @@
  */
 
 export default {
+  // Handle HTTP requests to the worker URL (health check / browser visits)
+  async fetch(request, env, ctx) {
+    return new Response("Email Worker is running. This endpoint only processes inbound emails.", {
+      status: 200,
+      headers: { "Content-Type": "text/plain" },
+    });
+  },
+
   async email(message, env, ctx) {
     const recipient = message.to;
     const sender = message.from;
