@@ -149,7 +149,6 @@ Do NOT include a subject line. Respond with ONLY the email body content. No expl
 
     try:
         # Call Groq API (FREE tier - OpenAI-compatible format)
-        # Using Llama 3.1 70B - excellent quality, fast inference
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(
                 "https://api.groq.com/openai/v1/chat/completions",
@@ -158,7 +157,7 @@ Do NOT include a subject line. Respond with ONLY the email body content. No expl
                     "Content-Type": "application/json"
                 },
                 json={
-                    "model": "llama-3.1-70b-versatile",  # FREE & high quality
+                    "model": "llama3-70b-8192",  # FREE & high quality (confirmed model name)
                     "messages": [
                         {"role": "system", "content": "You are an expert email writer who creates spam-free, professional emails. You write naturally and avoid spam trigger words."},
                         {"role": "user", "content": prompt}
@@ -169,10 +168,24 @@ Do NOT include a subject line. Respond with ONLY the email body content. No expl
             )
             
             if response.status_code != 200:
-                logger.error(f"Groq API error: {response.status_code} - {response.text}")
+                error_detail = response.text[:500] if response.text else "No details"
+                logger.error(f"Groq API error: {response.status_code} - {error_detail}")
+                # Return more specific error for debugging
+                if response.status_code == 401:
+                    return EmailWriteResponse(
+                        success=False,
+                        error="API key invalid. Please check configuration.",
+                        remaining_requests=remaining
+                    )
+                elif response.status_code == 429:
+                    return EmailWriteResponse(
+                        success=False,
+                        error="Rate limit exceeded. Please try again in a minute.",
+                        remaining_requests=remaining
+                    )
                 return EmailWriteResponse(
                     success=False,
-                    error="AI service error. Please try again.",
+                    error=f"AI service error ({response.status_code}). Please try again.",
                     remaining_requests=remaining
                 )
             
