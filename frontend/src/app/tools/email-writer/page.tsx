@@ -62,7 +62,7 @@ declare global {
   interface Window {
     puter: {
       ai: {
-        chat: (prompt: string, options?: { model?: string }) => Promise<string>;
+        chat: (prompt: string, options?: { model?: string; stream?: boolean }) => Promise<string>;
       };
     };
   }
@@ -78,6 +78,7 @@ export default function EmailWriterPage() {
   const [showContext, setShowContext] = useState(false);
   const [spamWarnings, setSpamWarnings] = useState<{ word: string; severity: "high" | "medium" }[]>([]);
   const [puterReady, setPuterReady] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Load Puter.js script
@@ -88,17 +89,25 @@ export default function EmailWriterPage() {
       script.src = "https://js.puter.com/v2/";
       script.async = true;
       script.onload = () => {
-        setPuterReady(true);
+        // Give it a moment to initialize
+        setTimeout(() => {
+          if (window.puter && window.puter.ai) {
+            setPuterReady(true);
+          }
+        }, 500);
+      };
+      script.onerror = () => {
+        setErrorMsg("Failed to load AI service. Please refresh the page.");
       };
       document.head.appendChild(script);
-    } else if (typeof window !== "undefined" && window.puter) {
+    } else if (typeof window !== "undefined" && window.puter && window.puter.ai) {
       setPuterReady(true);
     }
   }, []);
 
   // Detect spam words whenever generated email changes
   useEffect(() => {
-    if (generatedEmail) {
+    if (generatedEmail && !generatedEmail.startsWith("Sorry,") && !generatedEmail.startsWith("Error:")) {
       const warnings = detectSpamWords(generatedEmail);
       setSpamWarnings(warnings);
     } else {
@@ -107,13 +116,19 @@ export default function EmailWriterPage() {
   }, [generatedEmail]);
 
   const generateEmail = async () => {
-    if (!rawThoughts.trim() || !puterReady) return;
+    if (!rawThoughts.trim()) return;
 
     setIsLoading(true);
     setGeneratedEmail("");
     setSpamWarnings([]);
+    setErrorMsg("");
 
     try {
+      // Check if Puter is available
+      if (!window.puter || !window.puter.ai) {
+        throw new Error("AI service not loaded. Please refresh the page.");
+      }
+
       const contextPart = contextEmail.trim()
         ? `\n\nContext - I am responding to this email:\n"${contextEmail}"\n\n`
         : "";
@@ -135,16 +150,32 @@ IMPORTANT GUIDELINES:
 
 Do NOT include a subject line. Respond with ONLY the email body content.`;
 
+      // Use correct model name from Puter docs
       const response = await window.puter.ai.chat(prompt, {
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-0",
       });
 
-      setGeneratedEmail(response.trim());
-    } catch (error) {
+      if (typeof response === "string") {
+        setGeneratedEmail(response.trim());
+      } else if (response && typeof response === "object") {
+        // Handle if response is an object with text property
+        const text = (response as { text?: string }).text || JSON.stringify(response);
+        setGeneratedEmail(text.trim());
+      } else {
+        setGeneratedEmail(String(response).trim());
+      }
+    } catch (error: unknown) {
       console.error("Error generating email:", error);
-      setGeneratedEmail(
-        "Sorry, there was an error generating your email. Please try again."
-      );
+      const errMessage = error instanceof Error ? error.message : "Unknown error";
+      
+      if (errMessage.includes("auth") || errMessage.includes("login") || errMessage.includes("sign")) {
+        setErrorMsg("Please sign in to Puter to use this feature. A popup may have opened - please complete sign-in and try again.");
+      } else if (errMessage.includes("limit") || errMessage.includes("quota") || errMessage.includes("rate")) {
+        setErrorMsg("Daily limit reached. Please try again tomorrow or sign in to Puter for more credits.");
+      } else {
+        setErrorMsg("Could not generate email. Please try again.");
+      }
+      setGeneratedEmail("");
     } finally {
       setIsLoading(false);
     }
@@ -309,7 +340,7 @@ Do NOT include a subject line. Respond with ONLY the email body content.`;
             {/* Generate Button */}
             <button
               onClick={generateEmail}
-              disabled={isLoading || !rawThoughts.trim() || !puterReady}
+              disabled={isLoading || !rawThoughts.trim()}
               className="w-full bg-brand text-white py-4 px-8 rounded-xl font-semibold text-lg shadow-lg hover:bg-brand/90 hover:shadow-xl transform hover:scale-[1.01] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-3"
             >
               {isLoading ? (
@@ -328,7 +359,17 @@ Do NOT include a subject line. Respond with ONLY the email body content.`;
               )}
             </button>
             
-            {!puterReady && (
+            {/* Error Message */}
+            {errorMsg && (
+              <div className="bg-warn/10 border border-warn/30 rounded-xl p-4 text-center">
+                <p className="text-navy text-sm">{errorMsg}</p>
+                <p className="text-muted text-xs mt-2">
+                  💡 This uses a free AI service. If issues persist, try refreshing the page.
+                </p>
+              </div>
+            )}
+            
+            {!puterReady && !errorMsg && (
               <p className="text-center text-sm text-muted">
                 <span className="inline-block w-3 h-3 border-2 border-brand/30 border-t-brand rounded-full animate-spin mr-2"></span>
                 Loading AI...
@@ -382,6 +423,16 @@ Do NOT include a subject line. Respond with ONLY the email body content.`;
                   <pre className="whitespace-pre-wrap font-sans text-navy text-[15px] leading-relaxed">
                     {generatedEmail}
                   </pre>
+                </div>
+              ) : errorMsg ? (
+                <div className="flex flex-col items-center justify-center h-64 text-muted">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="opacity-40 mb-4 text-warn">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                  <p className="text-lg">Could not generate email</p>
+                  <p className="text-sm mt-1 text-center max-w-[280px]">Please check the error message below and try again</p>
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center h-64 text-muted">
