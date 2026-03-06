@@ -213,25 +213,37 @@ async def write_email(request: Request, body: EmailWriteRequest):
     if body.context and body.context.strip():
         context_part = f"\n\nI am responding to this email:\n\"\"\"\n{body.context.strip()}\n\"\"\"\n"
     
-    system_prompt = """You are an expert email copywriter specializing in high-deliverability emails. 
-You write emails that:
-- Sound natural and human (not robotic or templated)
-- Avoid spam trigger words (FREE, URGENT, ACT NOW, CLICK HERE, etc.)
-- Use proper formatting with clear paragraphs
-- Match the requested tone perfectly
-- Are concise yet complete
+    system_prompt = """You are an expert email copywriter who writes HIGH-DELIVERABILITY emails that NEVER trigger spam filters.
 
-Output ONLY the email body. No subject line, no explanations."""
+CRITICAL RULES - NEVER USE THESE WORDS:
+- FREE, free, complimentary, no cost, zero cost
+- URGENT, immediately, act now, limited time, expires
+- Click here, click below, click now
+- Guaranteed, promise, 100%
+- Winner, congratulations, selected
+- Opportunity, exclusive, special offer
+- Deal, discount, bonus, credit
+- Money, cash, earnings, profit
 
-    user_prompt = f"""Transform these thoughts into a polished email with a {body.tone} tone:
+WRITING STYLE:
+- Sound 100% natural and human
+- Use conversational language
+- Keep sentences varied in length
+- Use proper paragraphs (2-4 sentences each)
+- Be genuine and trustworthy
+- Match the requested tone exactly
+
+OUTPUT: Only the email body. No subject line. No explanations. No markdown formatting."""
+
+    user_prompt = f"""Write a {body.tone} email from these thoughts:
 
 "{body.thoughts}"{context_part}
 
-Requirements:
-- Tone: {body.tone}
-- Avoid spam words
-- Natural language only
-- Output the email body only"""
+MANDATORY:
+1. Tone: {body.tone}
+2. NO spam trigger words (especially: free, urgent, opportunity, guaranteed, click here)
+3. Sound like a real person wrote it
+4. Just the email body, nothing else"""
 
     # Call Groq API
     success, result = await _call_groq_api(user_prompt, system_prompt)

@@ -363,10 +363,47 @@ export default function EmailWriterPage() {
               </div>
               
               {generatedEmail ? (
-                <div className="bg-gray-50 rounded-xl p-5 border border-border">
-                  <pre className="whitespace-pre-wrap font-sans text-navy text-[15px] leading-relaxed">
-                    {generatedEmail}
-                  </pre>
+                <div className="space-y-4">
+                  {/* Spam Score Badge */}
+                  <div className="flex items-center justify-between">
+                    {spamWarnings.length === 0 ? (
+                      <span className="inline-flex items-center gap-1.5 bg-brand/10 text-brand text-sm font-medium px-3 py-1.5 rounded-full">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12" /></svg>
+                        Spam-Free
+                      </span>
+                    ) : spamWarnings.some(w => w.severity === "high") ? (
+                      <span className="inline-flex items-center gap-1.5 bg-danger/10 text-danger text-sm font-medium px-3 py-1.5 rounded-full">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                        {spamWarnings.length} Spam Triggers
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 bg-warn/10 text-warn text-sm font-medium px-3 py-1.5 rounded-full">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                        {spamWarnings.length} Minor Issues  
+                      </span>
+                    )}
+                    
+                    {/* Regenerate button when spam detected */}
+                    {spamWarnings.length > 0 && (
+                      <button
+                        onClick={generateEmail}
+                        disabled={isLoading}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-brand hover:text-brand/80 hover:bg-brand/5 rounded-lg transition-colors"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
+                          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                        </svg>
+                        Regenerate
+                      </button>
+                    )}
+                  </div>
+                  
+                  <div className="bg-gray-50 rounded-xl p-5 border border-border">
+                    <pre className="whitespace-pre-wrap font-sans text-navy text-[15px] leading-relaxed">
+                      {generatedEmail}
+                    </pre>
+                  </div>
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center h-64 text-muted">
