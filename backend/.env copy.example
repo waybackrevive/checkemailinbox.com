@@ -23,3 +23,13 @@ FRONTEND_URL=http://localhost:3000
 # AI Email Writer — Groq API key (FREE)
 # Get your free key at: https://console.groq.com/keys
 GROQ_API_KEY=gsk_your_groq_api_key_here
+
+# Contact Form — SMTP Configuration
+# For Gmail: Use smtp.gmail.com:587 with App Password (not regular password)
+# For SendGrid: Use smtp.sendgrid.net:587 with API key as password
+# For Mailgun: Use smtp.mailgun.org:587 with credentials
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your_email@gmail.com
+SMTP_PASSWORD=your_app_password_here
+CONTACT_EMAIL=contact@checkemaildelivery.com

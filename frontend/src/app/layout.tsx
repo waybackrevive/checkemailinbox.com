@@ -3,6 +3,8 @@ import { Instrument_Serif, Plus_Jakarta_Sans } from "next/font/google";
 import { Geist_Mono } from "next/font/google";
 import { Toaster } from "sonner";
 import { Providers } from "@/components/providers";
+import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 
 const instrumentSerif = Instrument_Serif({
@@ -69,6 +71,8 @@ export default function RootLayout({
           {children}
           <Toaster position="bottom-right" richColors />
         </Providers>
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );

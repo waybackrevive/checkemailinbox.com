@@ -106,7 +106,7 @@ export default function HomePage() {
           {!testEmail && !loading && !errorMsg && (
             <button
               onClick={handleStartTest}
-              className="w-full bg-navy text-white border-none cursor-pointer font-body text-[15px] font-semibold px-8 py-4 rounded-[14px] transition-all hover:bg-navy-soft"
+              className="w-full bg-navy text-white border-none cursor-pointer font-body text-sm sm:text-[15px] font-semibold px-4 sm:px-8 py-3 sm:py-4 rounded-[14px] transition-all hover:bg-navy-soft"
               style={{ boxShadow: "0 4px 24px rgba(12,26,46,0.14), 0 1px 3px rgba(12,26,46,0.06)" }}
             >
               🚀 Start Free Test — Generate My Test Address
@@ -168,13 +168,13 @@ export default function HomePage() {
               <div className="font-mono text-[11px] text-muted-light uppercase mb-2.5 text-left" style={{ letterSpacing: "1.5px" }}>
                 Your unique test address
               </div>
-              <div className="flex items-center bg-white border-2 border-border rounded-[14px] py-1.5 pl-[18px] pr-1.5 gap-2.5 transition-all hover:border-brand hover:shadow-[0_0_0_4px_rgba(14,166,110,0.1),0_4px_24px_rgba(12,26,46,0.06)]" style={{ boxShadow: "0 4px 24px rgba(12,26,46,0.06), 0 1px 3px rgba(12,26,46,0.04)" }}>
-                <span className="font-mono text-sm font-medium text-navy flex-1 select-all cursor-text">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center bg-white border-2 border-border rounded-[14px] py-1.5 sm:pl-[18px] sm:pr-1.5 p-3 sm:p-0 gap-2 sm:gap-2.5 transition-all hover:border-brand hover:shadow-[0_0_0_4px_rgba(14,166,110,0.1),0_4px_24px_rgba(12,26,46,0.06)]" style={{ boxShadow: "0 4px 24px rgba(12,26,46,0.06), 0 1px 3px rgba(12,26,46,0.04)" }}>
+                <span className="font-mono text-xs sm:text-sm font-medium text-navy flex-1 select-all cursor-text break-all sm:break-normal text-center sm:text-left py-2 sm:py-0">
                   {testEmail}
                 </span>
                 <button
                   onClick={handleCopy}
-                  className={`flex items-center gap-[7px] border-none cursor-pointer font-body text-[13px] font-semibold px-5 py-[11px] rounded-[10px] shrink-0 whitespace-nowrap transition-all ${copied ? "bg-brand" : "bg-navy hover:bg-navy-soft"} text-white`}
+                  className={`flex items-center justify-center gap-[7px] border-none cursor-pointer font-body text-xs sm:text-[13px] font-semibold px-4 sm:px-5 py-2.5 sm:py-[11px] rounded-[10px] shrink-0 whitespace-nowrap transition-all ${copied ? "bg-brand" : "bg-navy hover:bg-navy-soft"} text-white w-full sm:w-auto`}
                 >
                   <CopyIcon />
                   <span>{copied ? "✓ Copied!" : "Copy Address"}</span>
@@ -193,7 +193,7 @@ export default function HomePage() {
           <div className="mt-5 animate-fadeUp">
             <button
               onClick={handleGoWaiting}
-              className="bg-brand text-white text-sm font-semibold px-7 py-3 rounded-xl border-none cursor-pointer transition-all hover:opacity-90"
+              className="bg-brand text-white text-xs sm:text-sm font-semibold px-5 sm:px-7 py-2.5 sm:py-3 rounded-xl border-none cursor-pointer transition-all hover:opacity-90 w-full sm:w-auto max-w-xs sm:max-w-none mx-auto"
               style={{ boxShadow: "0 4px 16px rgba(14,166,110,0.3)" }}
             >
               I&apos;ve Sent My Email → Check Status
@@ -202,7 +202,7 @@ export default function HomePage() {
         )}
 
         {/* ─── STEPS ROW ─── */}
-        <div className="flex items-center justify-center gap-1.5 flex-wrap max-w-[620px] mx-auto mt-9 animate-fadeUp delay-400">
+        <div className="flex items-center justify-center gap-2 sm:gap-1.5 flex-wrap max-w-[620px] mx-auto mt-9 animate-fadeUp delay-400 px-2">
           {[
             { num: "1", text: "Copy the address above" },
             { num: "2", text: "Send your real email to it" },
@@ -210,11 +210,12 @@ export default function HomePage() {
           ].map((step, i) => (
             <div key={step.num} className="contents">
               {i > 0 && <span className="text-muted-light text-base hidden sm:inline">→</span>}
-              <div className="flex items-center gap-2 bg-white border border-border rounded-full px-4 py-2 text-[13px] text-navy font-medium" style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
-                <span className="w-5 h-5 bg-navy text-white rounded-full text-[11px] font-bold flex items-center justify-center shrink-0 font-mono">
+              <div className="flex items-center gap-1.5 sm:gap-2 bg-white border border-border rounded-full px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-[13px] text-navy font-medium w-full sm:w-auto justify-center" style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+                <span className="w-4 h-4 sm:w-5 sm:h-5 bg-navy text-white rounded-full text-[10px] sm:text-[11px] font-bold flex items-center justify-center shrink-0 font-mono">
                   {step.num}
                 </span>
-                {step.text}
+                <span className="hidden sm:inline">{step.text}</span>
+                <span className="sm:hidden">{step.text.replace("Copy the address above", "Copy address").replace("Send your real email to it", "Send email").replace("Come back for your full report", "Get report")}</span>
               </div>
             </div>
           ))}
@@ -222,12 +223,12 @@ export default function HomePage() {
       </section>
 
       {/* ─── TRUST BAR ─── */}
-      <div className="bg-white border-y border-border py-4 px-6 text-center">
-        <div className="max-w-[800px] mx-auto flex items-center justify-center gap-8 flex-wrap">
+      <div className="bg-white border-y border-border py-3 sm:py-4 px-4 sm:px-6 text-center">
+        <div className="max-w-[800px] mx-auto flex items-center justify-center gap-3 sm:gap-8 flex-wrap">
           {["✅ SPF · DKIM · DMARC checked", "🌍 15+ Blacklist databases", "📊 SpamAssassin powered", "🔒 Data deleted in 1 hour", "⚡ No signup required"].map((item, i) => (
             <div key={i} className="contents">
               {i > 0 && <span className="text-border text-lg hidden md:inline">|</span>}
-              <span className="flex items-center gap-2 text-[12.5px] text-muted font-medium">{item}</span>
+              <span className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-[12.5px] text-muted font-medium">{item}</span>
             </div>
           ))}
         </div>
