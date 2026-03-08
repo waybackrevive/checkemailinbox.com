@@ -27,4 +27,8 @@ GROQ_API_KEY=gsk_your_groq_api_key_here
 # Contact Form — relay via existing Cloudflare Worker (no SMTP required)
 # Use your Worker public URL, e.g. https://email-worker.checkemaildelivery.workers.dev
 CLOUDFLARE_WORKER_URL=https://your-worker-url.workers.dev
+# If Worker URL is protected by Cloudflare Access, set service token values
+# (Cloudflare Zero Trust -> Access -> Service Auth -> Service Tokens)
+CLOUDFLARE_ACCESS_CLIENT_ID=
+CLOUDFLARE_ACCESS_CLIENT_SECRET=
 CONTACT_EMAIL=connect@checkemaildelivery.com

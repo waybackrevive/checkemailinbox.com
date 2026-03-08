@@ -36,6 +36,13 @@ class Settings:
     CLOUDFLARE_WORKER_URL: str = field(
         default_factory=lambda: os.getenv("CLOUDFLARE_WORKER_URL", "")
     )
+    # Optional: Cloudflare Access service token for protected worker routes
+    CLOUDFLARE_ACCESS_CLIENT_ID: str = field(
+        default_factory=lambda: os.getenv("CLOUDFLARE_ACCESS_CLIENT_ID", "")
+    )
+    CLOUDFLARE_ACCESS_CLIENT_SECRET: str = field(
+        default_factory=lambda: os.getenv("CLOUDFLARE_ACCESS_CLIENT_SECRET", "")
+    )
 
     # SpamAssassin — runs inside the same container on Railway (localhost)
     SPAMASSASSIN_HOST: str = field(

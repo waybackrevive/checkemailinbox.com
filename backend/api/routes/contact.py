@@ -106,14 +106,19 @@ async def send_contact_email_via_worker(name: str, email: str, contact_type: str
 
     logger.info("Sending contact email to %s via worker %s", settings.CONTACT_EMAIL, url)
 
+    headers = {
+        "Content-Type": "application/json",
+        "X-Worker-Secret": settings.CLOUDFLARE_WORKER_SECRET or "",
+    }
+    if settings.CLOUDFLARE_ACCESS_CLIENT_ID and settings.CLOUDFLARE_ACCESS_CLIENT_SECRET:
+        headers["CF-Access-Client-Id"] = settings.CLOUDFLARE_ACCESS_CLIENT_ID
+        headers["CF-Access-Client-Secret"] = settings.CLOUDFLARE_ACCESS_CLIENT_SECRET
+
     async with httpx.AsyncClient(timeout=20.0, follow_redirects=False) as client:
         response = await client.post(
             url,
             json=payload,
-            headers={
-                "Content-Type": "application/json",
-                "X-Worker-Secret": settings.CLOUDFLARE_WORKER_SECRET or "",
-            },
+            headers=headers,
         )
 
     logger.info("Worker response: %s from POST %s", response.status_code, url)
@@ -122,6 +127,13 @@ async def send_contact_email_via_worker(name: str, email: str, contact_type: str
         location = response.headers.get("location", "")
         body_text = response.text
         if 300 <= response.status_code < 400:
+            if "cloudflareaccess.com" in location:
+                raise Exception(
+                    "Worker is behind Cloudflare Access login. "
+                    "Configure service token headers in Railway env: "
+                    "CLOUDFLARE_ACCESS_CLIENT_ID and CLOUDFLARE_ACCESS_CLIENT_SECRET, "
+                    "or exclude this worker route from Access."
+                )
             raise Exception(
                 f"Worker relay redirect: {response.status_code} location={location or 'missing'} body={body_text[:300]}"
             )
