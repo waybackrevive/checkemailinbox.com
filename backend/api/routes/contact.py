@@ -109,19 +109,10 @@ async def send_contact_email_via_worker(name: str, email: str, contact_type: str
                 "Content-Type": "application/json",
                 "X-Worker-Secret": settings.CLOUDFLARE_WORKER_SECRET or "",
             },
-            follow_redirects=False,  # Don't auto-follow 3xx redirects - treat as error
         )
 
-    # Log response for debugging
-    logger.info(f"Worker response: {response.status_code} from POST {url}")
-    
-    # Only accept 2xx responses (200, 201, etc.)
-    if response.status_code < 200 or response.status_code >= 300:
-        try:
-            resp_body = response.json()
-        except:
-            resp_body = response.text()
-        raise Exception(f"Worker relay failed: {response.status_code} {resp_body}")
+    if response.status_code >= 400:
+        raise Exception(f"Worker relay failed: {response.status_code} {response.text}")
 
     logger.info("Contact email relayed via Cloudflare Worker from %s (%s)", email, contact_type)
 

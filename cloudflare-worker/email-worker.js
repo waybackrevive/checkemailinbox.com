@@ -19,17 +19,10 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
-    // Log all incoming requests for debugging
-    console.log(`Incoming request: ${request.method} ${url.pathname} from ${request.headers.get("user-agent") || "unknown"}`);
-
     // Backend -> Worker relay for contact form notifications (no SMTP on backend)
     if (request.method === "POST" && url.pathname === "/contact/send") {
-      console.log("✅ Matched /contact/send POST handler");
       const providedSecret = request.headers.get("x-worker-secret") || "";
-      console.log(`Secret check: provided="${providedSecret}", env="${env.WORKER_SECRET || "unset"}"`);
-
       if ((env.WORKER_SECRET || "") && providedSecret !== env.WORKER_SECRET) {
-        console.log("❌ Secret mismatch - returning 403");
         return new Response(JSON.stringify({ ok: false, error: "Forbidden" }), {
           status: 403,
           headers: { "Content-Type": "application/json" },
@@ -38,8 +31,6 @@ export default {
 
       try {
         const body = await request.json();
-        console.log(`📨 Request body keys: ${Object.keys(body).join(", ")}`);
-
         const toEmail = body?.to_email || env.CONTACT_EMAIL || "";
         const subject = body?.subject || "Contact Form Submission";
         const text = body?.text || "";
@@ -47,10 +38,7 @@ export default {
         const fromName = body?.from_name || "CheckEmailDelivery Contact";
         const replyTo = body?.reply_to || "";
 
-        console.log(`To email: "${toEmail}", From name: "${fromName}"`);
-
         if (!toEmail) {
-          console.log("❌ Missing recipient email");
           return new Response(JSON.stringify({ ok: false, error: "Missing recipient (to_email or CONTACT_EMAIL)" }), {
             status: 500,
             headers: { "Content-Type": "application/json" },
@@ -71,32 +59,25 @@ export default {
           reply_to: replyTo ? { email: replyTo } : undefined,
         };
 
-        console.log(`📤 Sending to MailChannels for: ${toEmail}`);
-
         const mcResp = await fetch("https://api.mailchannels.net/tx/v1/send", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(mailchannelsPayload),
         });
 
-        console.log(`MailChannels response: ${mcResp.status}`);
-
         if (!mcResp.ok) {
           const err = await mcResp.text();
-          console.log(`❌ MailChannels error: ${err}`);
           return new Response(JSON.stringify({ ok: false, error: err }), {
             status: 502,
             headers: { "Content-Type": "application/json" },
           });
         }
 
-        console.log(`✅ Email sent successfully to ${toEmail}`);
         return new Response(JSON.stringify({ ok: true }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         });
       } catch (err) {
-        console.log(`❌ Exception: ${err?.message}`);
         return new Response(JSON.stringify({ ok: false, error: err?.message || "Bad Request" }), {
           status: 400,
           headers: { "Content-Type": "application/json" },
