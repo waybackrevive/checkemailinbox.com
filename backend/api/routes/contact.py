@@ -5,6 +5,7 @@ Contact Form API — Handle user inquiries
 import logging
 from datetime import datetime
 import html
+from urllib.parse import urljoin, urlparse
 
 import httpx
 
@@ -100,18 +101,41 @@ async def send_contact_email_via_worker(name: str, email: str, contact_type: str
 
     payload = _build_contact_payload(name, email, contact_type, message)
     url = settings.CLOUDFLARE_WORKER_URL.rstrip("/") + "/contact/send"
+    headers = {
+        "Content-Type": "application/json",
+        "X-Worker-Secret": settings.CLOUDFLARE_WORKER_SECRET or "",
+    }
 
     async with httpx.AsyncClient(timeout=20.0) as client:
         response = await client.post(
             url,
             json=payload,
-            headers={
-                "Content-Type": "application/json",
-                "X-Worker-Secret": settings.CLOUDFLARE_WORKER_SECRET or "",
-            },
+            headers=headers,
+            follow_redirects=False,
         )
 
-    if response.status_code >= 400:
+        # Handle a single same-host redirect safely (common with URL canonicalization).
+        if 300 <= response.status_code < 400:
+            location = response.headers.get("Location", "")
+            if not location:
+                raise Exception(f"Worker relay redirect without location: {response.status_code}")
+
+            redirect_url = urljoin(url, location)
+            orig = urlparse(url)
+            redir = urlparse(redirect_url)
+            if (orig.scheme, orig.netloc) != (redir.scheme, redir.netloc):
+                raise Exception(
+                    f"Worker relay redirected to different host: {response.status_code} {redirect_url}"
+                )
+
+            response = await client.post(
+                redirect_url,
+                json=payload,
+                headers=headers,
+                follow_redirects=False,
+            )
+
+    if response.status_code < 200 or response.status_code >= 300:
         raise Exception(f"Worker relay failed: {response.status_code} {response.text}")
 
     logger.info("Contact email relayed via Cloudflare Worker from %s (%s)", email, contact_type)
