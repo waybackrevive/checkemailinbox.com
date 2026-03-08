@@ -16,6 +16,20 @@ export default function ContactPage() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const buildDirectMailto = () => {
+    const subject = `[Contact] ${formData.contactType} from ${formData.name || "Website User"}`;
+    const body = [
+      `Name: ${formData.name || ""}`,
+      `Email: ${formData.email || ""}`,
+      `Contact Type: ${formData.contactType}`,
+      "",
+      "Message:",
+      formData.message || "",
+    ].join("\n");
+
+    return `mailto:connect@checkemaildelivery.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -40,11 +54,11 @@ export default function ContactPage() {
           message: "",
         });
       } else {
-        toast.error(data.error || "Failed to send message. Please try again.");
+        toast.error(data.error || "Sending failed. Use direct email fallback below.");
       }
     } catch (error) {
       console.error("Contact form error:", error);
-      toast.error("Network error. Please check your connection and try again.");
+      toast.error("Network error. Please use direct email fallback below.");
     } finally {
       setIsSubmitting(false);
     }
@@ -95,6 +109,16 @@ export default function ContactPage() {
             }}
           >
             <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Autofill compatibility field for browser extensions */}
+              <input
+                type="text"
+                name="username"
+                autoComplete="username"
+                tabIndex={-1}
+                aria-hidden="true"
+                className="hidden"
+              />
+
               {/* Name Field */}
               <div>
                 <label
@@ -107,6 +131,7 @@ export default function ContactPage() {
                   type="text"
                   id="name"
                   name="name"
+                  autoComplete="name"
                   value={formData.name}
                   onChange={handleChange}
                   required
@@ -127,6 +152,7 @@ export default function ContactPage() {
                   type="email"
                   id="email"
                   name="email"
+                  autoComplete="email"
                   value={formData.email}
                   onChange={handleChange}
                   required
@@ -169,6 +195,7 @@ export default function ContactPage() {
                 <textarea
                   id="message"
                   name="message"
+                  autoComplete="off"
                   value={formData.message}
                   onChange={handleChange}
                   required
@@ -212,6 +239,13 @@ export default function ContactPage() {
                   "Send Message"
                 )}
               </button>
+
+              <a
+                href={buildDirectMailto()}
+                className="block w-full text-center border border-brand text-brand hover:bg-brand hover:text-white font-semibold py-3.5 px-6 rounded-lg transition-all duration-200"
+              >
+                Send via Email App (Direct Fallback)
+              </a>
             </form>
 
             {/* Alternative Contact */}
