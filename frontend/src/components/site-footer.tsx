@@ -69,6 +69,24 @@ export default function SiteFooter() {
               Free email delivery audit tool. Check authentication, reputation,
               and content before you hit send.
             </p>
+
+            {/* Product Hunt badge */}
+            <div className="mt-5">
+              <a
+                href="https://www.producthunt.com/products/checkemaildelivery?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-checkemaildelivery"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  alt="CheckEmailDelivery - Email deliverability audit + AI writer. Free. 60 seconds. | Product Hunt"
+                  width="250"
+                  height="54"
+                  src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1094499&theme=light&t=1773155296647"
+                  style={{ display: "block" }}
+                />
+              </a>
+            </div>
           </div>
 
           {/* Columns */}

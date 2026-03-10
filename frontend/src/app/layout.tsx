@@ -5,6 +5,7 @@ import { Toaster } from "sonner";
 import { Providers } from "@/components/providers";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import LaunchCelebration from "@/components/launch-celebration";
 import "./globals.css";
 
 const instrumentSerif = Instrument_Serif({
@@ -70,6 +71,7 @@ export default function RootLayout({
         <Providers>
           {children}
           <Toaster position="bottom-right" richColors />
+          <LaunchCelebration />
         </Providers>
         <Analytics />
         <SpeedInsights />
