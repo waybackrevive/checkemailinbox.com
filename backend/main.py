@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
 from api.routes import test, webhook, report, ai, contact
+from storage.redis_client import get_redis
 
 # Configure logging
 logging.basicConfig(
@@ -67,5 +68,12 @@ async def root():
 
 @app.get("/health")
 async def health():
-    """Health check for Docker/Render."""
-    return {"status": "ok"}
+    """Health check for Docker/Render. Also pings Redis to keep Upstash free tier active."""
+    redis_ok = False
+    try:
+        r = get_redis()
+        r.set("_health_ping", "1", ex=60)  # ping with 60s TTL, no junk left behind
+        redis_ok = True
+    except Exception:
+        pass  # Redis down shouldn't kill the health check response
+    return {"status": "ok", "redis": "ok" if redis_ok else "error"}
